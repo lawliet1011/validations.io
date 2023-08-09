@@ -26,11 +26,10 @@ function Validator(options){
 
             switch(inputElement.type){
                 case 'radio':
+                case 'checkbox':
                     errorMessage = rules[i](
                         formElement.querySelector(rule.selector + ':checked')
                     );
-                    break;
-                case 'checkbox':
                     break;
                 default:
                     errorMessage = rules[i](inputElement.value);
@@ -70,7 +69,31 @@ function Validator(options){
                     var enableInputs = formElement.querySelectorAll('[name]:not([disable])');
 
                     var formValues = Array.from(enableInputs).reduce(function(values, input){
-                        values[input.name] = input.value;
+                        switch(input.type){
+                            case 'file':
+                                values[input.name] = input.files;
+                                break;
+                            case 'checkbox':
+                                if(!input.matches(':checked')) {
+                                    values[input.name] = '';
+                                    return values;
+                                }
+
+                                if(!Array.isArray(values[input.name])){
+                                    values[input.name] = [];
+                                }
+
+                                values[input.name].push(input.value);
+                                break;
+                            case 'radio':
+                                if(input.matches(':checked')){
+                                    // values[input.name] = formElement.querySelector('input[name="' + input.name + '"]:checked').value;
+                                    values[input.name] = input.value;
+                                }
+                                break;
+                            default:
+                                values[input.name] = input.value;
+                        }
                         return values;
                     }, {}); 
                    
@@ -93,21 +116,23 @@ function Validator(options){
                 selectorRules[rule.selector] = [rule.test];
             }
 
-            var inputElement = formElement.querySelector(rule.selector);
+            var inputElements = formElement.querySelectorAll(rule.selector);
 
-            if(inputElement){
-                //Xử lý trường hợp blur khỏi input
-                inputElement.onblur = function () {
-                    validate(inputElement, rule);
-                }
+            Array.from(inputElements).forEach(function(inputElement){
+                    //Xử lý trường hợp blur khỏi input
+                    inputElement.onblur = function () {
+                        validate(inputElement, rule);
+                    }
+    
+                    //Xử lý mỗi khi người dùng nhập vào input
+                    inputElement.oninput = function() {
+                        errorElement = getParent(inputElement, options.formGroupSelector).querySelector(options.errorSelector);
+                        errorElement.innerText = '';
+                        getParent(inputElement, options.formGroupSelector).classList.remove('invalid');
+                    }
+            })
 
-                //Xử lý mỗi khi người dùng nhập vào input
-                inputElement.oninput = function() {
-                    errorElement = getParent(inputElement, options.formGroupSelector).querySelector(options.errorSelector);
-                    errorElement.innerText = '';
-                    getParent(inputElement, options.formGroupSelector).classList.remove('invalid');
-                }
-            }
+            
         });
     }
 
@@ -119,7 +144,7 @@ Validator.isRequired = function(selector){
     return {
         selector: selector,
         test: function (value) {
-            return value.trim() ? undefined : 'Vui lòng nhập trường này!';
+            return value ? undefined : 'Vui lòng nhập trường này!';
         }
     }
 }
